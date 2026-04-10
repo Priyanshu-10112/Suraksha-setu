@@ -1,33 +1,35 @@
 # Suraksha-Setu 🛡️
 
-Real-time AI-powered intrusion detection system with multi-camera support using YOLOv8.
+AI-powered intrusion detection system with real-time person detection, zone-based monitoring, and live video feed with color-coded alerts.
 
 ## 🎯 Overview
 
-Suraksha-Setu is a comprehensive security monitoring system that uses computer vision and AI to detect human intrusions in restricted zones. It supports multiple cameras, real-time alerts, risk scoring, and provides a complete RESTful API for integration.
+Suraksha-Setu uses YOLOv8 for real-time person detection across multiple camera feeds. It features zone-based intrusion detection with three zone types (normal, safe, restricted), advanced tracking, risk scoring, and live video streams with color-coded bounding boxes.
 
 ## ✨ Features
 
-- 📹 **Multi-camera Management** - Add, monitor, and control multiple camera streams
-- 🎯 **Zone-based Detection** - Define custom restricted zones per camera
-- 🧠 **AI-Powered Detection** - YOLOv8 for accurate person detection
-- ⚠️ **Risk Scoring System** - Intelligent risk assessment (low/medium/high)
-- ⚡ **Real-time Alerts** - Instant WebSocket notifications
-- 💾 **Persistent Storage** - SQLite database with alert history
-- 🖼️ **Frame Capture** - Automatic saving of intrusion frames
-- 🔌 **RESTful API** - Complete API for all operations
-- 🎨 **Interactive Docs** - Auto-generated Swagger UI
+- 📹 **Multi-camera Support** - Monitor multiple cameras simultaneously
+- 🎯 **Zone-based Detection** - Three zone types: Normal, Safe, Restricted
+- 🧠 **YOLOv8 Person Detection** - Accurate real-time detection
+- 📊 **Advanced Tracking** - IoU-based tracking with 3-frame confirmation
+- ⚠️ **Smart Risk Scoring** - Dynamic risk calculation (0-100)
+- 🎨 **Live Video Feed** - Color-coded bounding boxes (Green/Yellow/Red)
+- 🔴 **Zone Visualization** - Real-time zone overlays on video
+- ⚡ **WebSocket Alerts** - Instant real-time notifications
+- 💾 **Alert History** - SQLite database with captured frames
+- 🔌 **RESTful API** - Complete API with Swagger docs
+- 🔄 **Auto-reconnect** - Automatic camera recovery on failures
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.10+
-- Webcam or IP camera
+- Camera (Webcam/DroidCam/IP Camera)
 - 4GB RAM minimum
 
 ### Installation
 
-1. **Clone and navigate:**
+1. **Navigate to backend:**
 ```bash
 cd backend
 ```
@@ -44,16 +46,13 @@ python main.py
 
 Server starts at `http://localhost:8000` 🎉
 
-### First Time Setup
-
-The system will automatically:
-- Download YOLOv8 model (yolov8n.pt) on first run
-- Create SQLite database
-- Initialize storage folders
+### First Run
+- YOLOv8 model downloads automatically
+- Database and storage folders created
+- Ready to add cameras
 
 ## 📚 API Documentation
 
-Interactive API docs available at:
 - **Swagger UI:** `http://localhost:8000/docs`
 - **ReDoc:** `http://localhost:8000/redoc`
 
@@ -66,7 +65,7 @@ Interactive API docs available at:
 | POST | `/api/cameras` | Add new camera |
 | GET | `/api/cameras` | List all cameras |
 | GET | `/api/cameras/{camera_id}` | Get camera details |
-| DELETE | `/api/cameras/{camera_id}` | Delete camera |
+| DELETE | `/api/cameras/{camera_id}` | Delete camera + zones |
 
 ### 🎯 Zone Management
 
@@ -83,6 +82,14 @@ Interactive API docs available at:
 | POST | `/api/control/start/{camera_id}` | Start detection |
 | POST | `/api/control/stop/{camera_id}` | Stop detection |
 | GET | `/api/control/active` | Get active cameras |
+
+### 📺 Video Stream
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/stream/video_feed/{camera_id}` | Live MJPEG stream with detection |
+| POST | `/api/stream/test` | Test camera source |
+| GET | `/api/stream/health/{camera_id}` | Camera health check |
 
 ### ⚠️ Alerts
 
@@ -104,67 +111,83 @@ Interactive API docs available at:
 curl -X POST http://localhost:8000/api/cameras \
   -H "Content-Type: application/json" \
   -d '{
-    "camera_id": "cam1",
+    "camera_id": "CAM1",
     "source": "0",
     "location": "Main Gate",
-    "type": "restricted"
+    "type": "security"
   }'
 ```
 
-**Parameters:**
-- `camera_id`: Unique identifier
-- `source`: Camera source (0 for webcam, URL for IP camera)
-- `location`: Physical location name
-- `type`: "normal" or "restricted"
+**Camera Sources:**
+- `"0"` - Laptop webcam
+- `"1"` - DroidCam (install DroidCam app first)
+- `"http://192.168.1.100:8080/video"` - IP Camera URL
 
-### 2. Define Restricted Zone
+### 2. Define Zone
 
 ```bash
 curl -X POST http://localhost:8000/api/zones \
   -H "Content-Type: application/json" \
   -d '{
-    "camera_id": "cam1",
+    "camera_id": "CAM1",
     "x1": 200,
     "y1": 150,
     "x2": 440,
-    "y2": 330
+    "y2": 330,
+    "zone_type": "restricted"
   }'
 ```
 
-**Zone Coordinates:**
-- `(x1, y1)`: Top-left corner
-- `(x2, y2)`: Bottom-right corner
+**Zone Types:**
+- `"normal"` - No alerts, green boxes
+- `"safe"` - Presence alerts, yellow boxes
+- `"restricted"` - Intrusion alerts, red boxes
 
 ### 3. Start Detection
 
 ```bash
-curl -X POST http://localhost:8000/api/control/start/cam1
+curl -X POST http://localhost:8000/api/control/start/CAM1
 ```
 
-### 4. Get Alerts
+### 4. View Live Feed
+
+Open in browser:
+```
+http://localhost:8000/api/stream/video_feed/CAM1
+```
+
+Features:
+- Real-time person detection
+- Color-coded bounding boxes
+- Zone overlays
+- Confidence percentages
+
+### 5. Get Alerts
 
 ```bash
-curl http://localhost:8000/api/alerts?limit=10
+curl http://localhost:8000/api/alerts?limit=20
 ```
 
-### 5. WebSocket Connection (JavaScript)
+### 6. WebSocket Connection
 
 ```javascript
 const ws = new WebSocket('ws://localhost:8000/ws');
 
 ws.onmessage = (event) => {
   const alert = JSON.parse(event.data);
-  console.log('Alert received:', alert);
+  console.log('Alert:', alert);
   // {
   //   type: "alert",
-  //   camera_id: "cam1",
+  //   camera_id: "CAM1",
   //   location: "Main Gate",
-  //   risk: 87,
+  //   risk: 89,
   //   risk_level: "high",
-  //   confidence: 0.92,
-  //   image: "cam1_20260409_143022.jpg",
-  //   message: "Intrusion detected at Main Gate",
-  //   timestamp: "2026-04-09T14:30:22.123456"
+  //   confidence: 0.87,
+  //   image: "CAM1_20260410_143022.jpg",
+  //   message: "⚠️ INTRUSION ALERT - Camera 'CAM1' at Main Gate...",
+  //   timestamp: "2026-04-10T14:30:22",
+  //   zone_type: "restricted",
+  //   alert_type: "intrusion"
   // }
 };
 ```
@@ -175,19 +198,29 @@ Edit `backend/config.py`:
 
 ```python
 # Detection Settings
-CONFIDENCE_THRESHOLD = 0.6      # Min confidence (0.0-1.0)
+CONFIDENCE_THRESHOLD = 0.5      # Min confidence (lowered for better detection)
 COOLDOWN_SECONDS = 5            # Alert cooldown time
 FRAME_SKIP = 2                  # Process every Nth frame
 
-# Risk Scoring
-RISK_BASE_MULTIPLIER = 100      # Base risk calculation
-RISK_ZONE_BONUS = 20            # Bonus for zone intrusion
-RISK_LOWLIGHT_BONUS = 10        # Bonus for low-light
+# Tracking Settings
+TRACKING_IOU_THRESHOLD = 0.3    # IoU threshold for tracking
+TRACKING_MAX_AGE = 5            # Frames to keep track
+TRACKING_MIN_HITS = 3           # Min detections to confirm
 
-# Paths
-DB_PATH = "storage/suraksha.db"
-ALERT_STORAGE_PATH = "storage/alerts"
-YOLO_MODEL_PATH = "yolov8n.pt"
+# Zone Settings
+ZONE_IOA_THRESHOLD = 0.15       # Min 15% overlap to trigger
+ZONE_MARGIN = 0.05              # 5% zone margin
+
+# Filter Settings
+EDGE_MARGIN = 0.0               # Edge filter (disabled)
+MIN_BBOX_WIDTH = 30             # Min box width
+MIN_BBOX_HEIGHT = 30            # Min box height
+
+# Risk Scoring
+RISK_BASE_MULTIPLIER = 100
+RISK_ZONE_BONUS = 20
+RISK_STABILITY_BONUS = 10
+RISK_EDGE_PENALTY = 10
 ```
 
 ## 📁 Project Structure
@@ -195,71 +228,94 @@ YOLO_MODEL_PATH = "yolov8n.pt"
 ```
 suraksha-setu/
 ├── backend/
-│   ├── main.py                 # FastAPI application entry
-│   ├── database.py             # SQLite initialization
-│   ├── config.py               # Global configuration
+│   ├── main.py                 # FastAPI application
+│   ├── database.py             # SQLite setup
+│   ├── config.py               # Configuration
 │   │
 │   ├── models/                 # Data models
-│   │   ├── camera.py           # Camera CRUD operations
-│   │   ├── zone.py             # Zone CRUD operations
-│   │   └── alert.py            # Alert CRUD operations
+│   │   ├── camera.py           # Camera CRUD
+│   │   ├── zone.py             # Zone CRUD
+│   │   └── alert.py            # Alert CRUD
 │   │
-│   ├── routes/                 # API endpoints
-│   │   ├── cameras.py          # Camera routes
-│   │   ├── zones.py            # Zone routes
-│   │   ├── alerts.py           # Alert routes
-│   │   └── control.py          # Detection control routes
+│   ├── routes/                 # API routes
+│   │   ├── cameras.py
+│   │   ├── zones.py
+│   │   ├── alerts.py
+│   │   ├── control.py
+│   │   └── stream.py           # Video streaming
 │   │
-│   ├── services/               # Core business logic
-│   │   ├── detection.py        # YOLO + OpenCV detection
-│   │   ├── websocket.py        # WebSocket manager
-│   │   └── risk.py             # Risk scoring engine
+│   ├── services/               # Core logic
+│   │   ├── detection.py        # Main detection loop
+│   │   ├── stream.py           # Camera streaming
+│   │   ├── tracking.py         # Object tracking
+│   │   ├── filters.py          # Detection filters
+│   │   ├── zone_utils.py       # Zone calculations
+│   │   ├── motion.py           # Motion detection
+│   │   ├── risk.py             # Risk scoring
+│   │   └── websocket.py        # WebSocket manager
 │   │
-│   ├── storage/                # Data storage (auto-created)
-│   │   ├── suraksha.db         # SQLite database
+│   ├── storage/                # Auto-created
+│   │   ├── suraksha.db         # Database
 │   │   └── alerts/             # Alert images
 │   │
-│   ├── requirements.txt        # Python dependencies
-│   └── .gitignore
+│   ├── requirements.txt
+│   └── yolov8n.pt             # YOLO model (auto-downloaded)
 │
-├── frontend/                   # Frontend (coming soon)
 └── README.md
 ```
 
 ## 🔧 How It Works
 
-1. **Camera Registration**: Add cameras via API with source and location
-2. **Zone Definition**: Define rectangular restricted zones for each camera
-3. **Detection Start**: Start detection loop for specific camera
-4. **Frame Processing**: 
-   - Capture frames from camera
-   - Skip frames for performance (configurable)
-   - Run YOLOv8 person detection
-5. **Intrusion Logic**:
-   - Check if person's bounding box center is inside zone
-   - Only trigger for "restricted" type cameras
-   - Apply confidence threshold
-6. **Risk Calculation**:
-   - Base risk = confidence × 100
-   - Add zone bonus (+20)
-   - Categorize: low (<40), medium (40-70), high (>70)
-7. **Alert Generation**:
-   - Save frame to disk
-   - Store alert in database
-   - Broadcast via WebSocket
-8. **Cooldown**: Prevent alert spam with configurable cooldown
+### Detection Pipeline
 
-## 🎨 Risk Levels
+1. **Camera Stream**: Shared camera access with thread-safe locks
+2. **Frame Processing**: Every 2nd frame (configurable)
+3. **YOLO Detection**: Person detection with confidence threshold
+4. **Filtering**: Edge, size, and confidence filters
+5. **Tracking**: IoU-based tracking with 3-frame confirmation
+6. **Zone Check**: Calculate Intersection over Area (IoA)
+7. **Risk Calculation**: Multi-factor risk scoring
+8. **Alert Generation**: Save frame, database entry, WebSocket broadcast
 
-| Risk Score | Level | Color | Action |
-|------------|-------|-------|--------|
-| 0-39 | Low | 🟢 Green | Monitor |
-| 40-69 | Medium | 🟡 Yellow | Alert |
-| 70-100 | High | 🔴 Red | Immediate Action |
+### Zone Types & Alerts
+
+| Zone Type | Alert Type | Box Color | Risk Bonus |
+|-----------|------------|-----------|------------|
+| Normal | None | 🟢 Green | +0 |
+| Safe | Presence | 🟡 Yellow | +10 |
+| Restricted | Intrusion | 🔴 Red | +30 |
+
+### Risk Scoring
+
+```
+Base Risk = Confidence × 100
++ Zone fully inside bonus (+20)
++ Stable tracking bonus (+10)
+- Near boundary penalty (-10)
+= Final Risk (0-100)
+```
+
+**Risk Levels:**
+- 0-39: Low (🟢)
+- 40-69: Medium (🟡)
+- 70-100: High (🔴)
+
+## 🎨 Live Video Features
+
+The live video feed (`/api/stream/video_feed/{camera_id}`) shows:
+
+- **Real-time Detection**: Person detection every 2 frames
+- **Color-coded Boxes**:
+  - Green: Person in normal zone
+  - Yellow: Person in safe zone
+  - Red: Person in restricted zone
+- **Zone Overlays**: Semi-transparent zone boundaries
+- **Labels**: "PERSON 85%", "PRESENCE 92%", "INTRUSION 78%"
+- **Zone Labels**: "NORMAL ZONE", "SAFE ZONE", "RESTRICTED ZONE"
 
 ## 🛠️ Tech Stack
 
-- **Backend Framework**: FastAPI
+- **Backend**: FastAPI
 - **AI/ML**: YOLOv8 (Ultralytics)
 - **Computer Vision**: OpenCV
 - **Database**: SQLite
@@ -268,86 +324,86 @@ suraksha-setu/
 
 ## 📊 Database Schema
 
-### Cameras Table
+### Cameras
 ```sql
-- id (INTEGER PRIMARY KEY)
-- camera_id (TEXT UNIQUE)
-- source (TEXT)
-- location (TEXT)
-- type (TEXT)
-- active (INTEGER)
-- created_at (TEXT)
+- id, camera_id (UNIQUE), source, location, type, active, created_at
 ```
 
-### Zones Table
+### Zones
 ```sql
-- id (INTEGER PRIMARY KEY)
-- camera_id (TEXT)
-- x1, y1, x2, y2 (INTEGER)
+- id, camera_id (FK), x1, y1, x2, y2, zone_type
 ```
 
-### Alerts Table
+### Alerts
 ```sql
-- id (INTEGER PRIMARY KEY)
-- camera_id (TEXT)
-- location (TEXT)
-- risk (INTEGER)
-- confidence (REAL)
-- image_path (TEXT)
-- message (TEXT)
-- timestamp (TEXT)
+- id, camera_id (FK), location, risk, confidence
+- image_path, message, timestamp, zone_type, alert_type
 ```
+
+**Note:** Deleting a camera automatically deletes its zones.
 
 ## 🚦 Performance Tips
 
-1. **Frame Skip**: Increase `FRAME_SKIP` for slower systems
-2. **Resolution**: Use lower resolution cameras for better FPS
-3. **Multiple Cameras**: Each camera runs in separate async task
-4. **Cooldown**: Adjust `COOLDOWN_SECONDS` to reduce alert frequency
+1. **Frame Skip**: Increase for slower systems (default: 2)
+2. **Resolution**: Lower resolution = better FPS
+3. **Confidence**: Higher threshold = fewer false positives
+4. **IoA Threshold**: Lower = more sensitive detection
+5. **Multiple Cameras**: Each runs in separate async task
 
 ## 🔒 Security Notes
 
-- System runs locally, no cloud dependency
-- Alert images stored locally in `storage/alerts/`
-- Database stored locally in `storage/suraksha.db`
-- WebSocket connections are not authenticated (add auth for production)
+- Runs locally, no cloud dependency
+- Alert images stored in `storage/alerts/`
+- Database in `storage/suraksha.db`
+- Add authentication for production use
 
 ## 🐛 Troubleshooting
 
-**Camera not detected:**
-- Check camera source (0 for webcam, URL for IP camera)
-- Ensure camera is not being used by another application
+**Camera not opening:**
+- Check source: "0" (webcam), "1" (DroidCam)
+- Close other apps using camera
+- For DroidCam: Install app and start server first
 
-**No alerts generated:**
-- Verify camera type is "restricted"
-- Check if zones are properly defined
-- Ensure person is inside the zone
-- Check confidence threshold in config
+**No alerts:**
+- Check zone type (must be "safe" or "restricted")
+- Verify person is inside zone (check IoA in logs)
+- Lower confidence threshold in config
 
-**High CPU usage:**
-- Increase `FRAME_SKIP` value
-- Use smaller camera resolution
-- Reduce number of active cameras
+**Stream not loading:**
+- Check camera is added: `GET /api/cameras`
+- Start detection first: `POST /api/control/start/{camera_id}`
+- Check browser supports MJPEG
 
-**"Camera index out of range" error:**
-- No camera connected at that source index
-- Camera already in use by another app (close other apps)
-- For mobile camera: Install DroidCam/iVCam first
-- Try different source: "0", "1", etc.
-- For IP camera: Use full URL like "http://192.168.1.100:8080/video"
+**High CPU:**
+- Increase `FRAME_SKIP` (2 → 3 or 4)
+- Use lower camera resolution
+- Reduce active cameras
 
-## 📝 License
+**Orphan zones error:**
+- Fixed: Deleting camera now auto-deletes zones
+- Manual cleanup: Delete zones before camera
 
-MIT License - Feel free to use for personal and commercial projects.
+## 📝 Multi-Camera Setup
 
-## 🤝 Contributing
+For multiple cameras, use unique sources:
 
-Contributions welcome! Please feel free to submit a Pull Request.
+```bash
+# Camera 1: Laptop webcam
+{"camera_id": "CAM1", "source": "0", ...}
+
+# Camera 2: DroidCam
+{"camera_id": "CAM2", "source": "1", ...}
+
+# Camera 3: IP Camera
+{"camera_id": "CAM3", "source": "http://192.168.1.100:8080/video", ...}
+```
+
+**Important:** Each camera needs a unique source. Don't use same source for multiple cameras.
 
 ## 📧 Support
 
-For issues and questions, please open an issue on GitHub.
+For issues, check logs or open a GitHub issue.
 
 ---
 
-**Made with ❤️ for better security monitoring**
+**Built with ❤️ for intelligent security monitoring**
