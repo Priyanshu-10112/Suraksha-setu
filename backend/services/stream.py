@@ -2,10 +2,33 @@ import cv2
 import asyncio
 from typing import Dict, Optional
 from threading import Lock
+from ultralytics import YOLO
+from pathlib import Path
+
+# Import detection utilities
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from config import (
+    CONFIDENCE_THRESHOLD, YOLO_MODEL_PATH,
+    ZONE_IOA_THRESHOLD, ZONE_MARGIN
+)
 
 # Global camera streams dictionary
 camera_streams: Dict[str, cv2.VideoCapture] = {}
 stream_locks: Dict[str, Lock] = {}
+
+# YOLO model for live detection
+live_model = None
+
+def init_live_model():
+    """Initialize YOLO model for live stream detection"""
+    global live_model
+    if live_model is None:
+        import torch
+        _original_load = torch.load
+        torch.load = lambda *args, **kwargs: _original_load(*args, **{**kwargs, 'weights_only': False})
+        live_model = YOLO(YOLO_MODEL_PATH)
+        print("✅ Live detection model loaded for video streams")
 
 def get_camera_stream(camera_id: str, source: str) -> Optional[cv2.VideoCapture]:
     """Get or create camera stream with retry logic"""
@@ -82,17 +105,28 @@ def test_camera_source(source: str) -> bool:
         return False
 
 def generate_frames(camera_id: str, source: str):
-    """Generate MJPEG frames for streaming with auto-reconnect"""
+    """Generate MJPEG frames with real-time person detection and color-coded boxes"""
+    from models.zone import get_zones
+    from services.zone_utils import calculate_intersection_over_area, apply_zone_margin
+    
     cap = get_camera_stream(camera_id, source)
     
     if not cap:
         print(f"❌ Failed to get camera stream for {camera_id}")
         return
     
-    print(f"✅ Starting stream for {camera_id}")
+    # Initialize live detection model
+    init_live_model()
+    
+    # Get zones for this camera
+    zones = get_zones(camera_id)
+    zones_with_margin = [apply_zone_margin(z, ZONE_MARGIN) for z in zones]
+    
+    print(f"✅ Starting enhanced stream for {camera_id} with {len(zones)} zones")
     
     consecutive_failures = 0
     max_failures = 5
+    frame_count = 0
     
     try:
         while True:
@@ -107,7 +141,6 @@ def generate_frames(camera_id: str, source: str):
                 
                 if not success:
                     consecutive_failures += 1
-                    print(f"❌ Failed to read frame from {camera_id} (attempt {consecutive_failures}/{max_failures})")
                     
                     if consecutive_failures >= max_failures:
                         print(f"❌ Max failures reached for {camera_id}, attempting reconnect...")
@@ -134,11 +167,88 @@ def generate_frames(camera_id: str, source: str):
                 
                 # Reset failure counter on success
                 consecutive_failures = 0
+                frame_count += 1
+                
+                # Run detection every 2 frames for performance
+                if frame_count % 2 == 0 and live_model:
+                    # Run YOLO detection
+                    results = live_model(frame, classes=[0], verbose=False)
+                    
+                    # Draw detections with color coding
+                    for result in results:
+                        boxes = result.boxes
+                        for box in boxes:
+                            confidence = float(box.conf[0])
+                            
+                            # Only show confident detections
+                            if confidence < CONFIDENCE_THRESHOLD:
+                                continue
+                            
+                            bbox = box.xyxy[0].cpu().numpy().tolist()
+                            x1, y1, x2, y2 = [int(v) for v in bbox]
+                            
+                            # Determine zone type and color
+                            zone_type = "normal"
+                            best_ioa = 0
+                            
+                            for zone in zones_with_margin:
+                                ioa = calculate_intersection_over_area(bbox, zone)
+                                if ioa >= ZONE_IOA_THRESHOLD and ioa > best_ioa:
+                                    zone_type = zone.get("zone_type", "normal")
+                                    best_ioa = ioa
+                            
+                            # Color coding based on zone type
+                            if zone_type == "restricted":
+                                color = (0, 0, 255)  # Red for restricted
+                                label = f"INTRUSION {int(confidence*100)}%"
+                            elif zone_type == "safe":
+                                color = (0, 255, 255)  # Yellow for safe
+                                label = f"PRESENCE {int(confidence*100)}%"
+                            else:
+                                color = (0, 255, 0)  # Green for normal
+                                label = f"PERSON {int(confidence*100)}%"
+                            
+                            # Draw bounding box
+                            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                            
+                            # Draw label background
+                            label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+                            cv2.rectangle(frame, (x1, y1 - label_size[1] - 10), 
+                                        (x1 + label_size[0], y1), color, -1)
+                            
+                            # Draw label text
+                            cv2.putText(frame, label, (x1, y1 - 5), 
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                    
+                    # Draw zones on frame (semi-transparent)
+                    overlay = frame.copy()
+                    for zone in zones:
+                        z_x1, z_y1 = int(zone['x1']), int(zone['y1'])
+                        z_x2, z_y2 = int(zone['x2']), int(zone['y2'])
+                        z_type = zone.get('zone_type', 'normal')
+                        
+                        # Zone border color
+                        if z_type == "restricted":
+                            z_color = (0, 0, 255)  # Red
+                        elif z_type == "safe":
+                            z_color = (0, 255, 255)  # Yellow
+                        else:
+                            z_color = (0, 255, 0)  # Green
+                        
+                        # Draw zone rectangle
+                        cv2.rectangle(overlay, (z_x1, z_y1), (z_x2, z_y2), z_color, 2)
+                        
+                        # Zone label
+                        zone_label = f"{z_type.upper()} ZONE"
+                        cv2.putText(overlay, zone_label, (z_x1 + 5, z_y1 + 20), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, z_color, 2)
+                    
+                    # Blend overlay with original frame
+                    frame = cv2.addWeighted(overlay, 0.8, frame, 0.2, 0)
                 
                 # Encode frame as JPEG
                 ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 if not ret:
-                    print(f"❌ Failed to encode frame for {camera_id}")
                     continue
                 
                 frame_bytes = buffer.tobytes()

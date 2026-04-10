@@ -56,9 +56,18 @@ def get_camera(camera_id):
     }
 
 def delete_camera(camera_id):
-    """Delete camera"""
+    """Delete camera and its associated zones"""
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Delete zones first (foreign key constraint)
+    cursor.execute("DELETE FROM zones WHERE camera_id = ?", (camera_id,))
+    zones_deleted = cursor.rowcount
+    
+    # Delete camera
     cursor.execute("DELETE FROM cameras WHERE camera_id = ?", (camera_id,))
+    
     conn.commit()
     conn.close()
+    
+    print(f"🗑️ Deleted camera {camera_id} and {zones_deleted} associated zones")
