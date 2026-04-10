@@ -10,11 +10,17 @@ class ZoneCreate(BaseModel):
     y1: int
     x2: int
     y2: int
+    zone_type: str = "normal"  # "normal", "safe", "restricted"
 
 @router.post("/")
 async def create_zone(zone: ZoneCreate):
     """Add zone for camera"""
-    result = add_zone(zone.camera_id, zone.x1, zone.y1, zone.x2, zone.y2)
+    # Validate zone_type
+    valid_types = ["normal", "safe", "restricted"]
+    if zone.zone_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid zone_type. Must be one of: {valid_types}")
+    
+    result = add_zone(zone.camera_id, zone.x1, zone.y1, zone.x2, zone.y2, zone.zone_type)
     return {"status": "success", "zone": result}
 
 @router.get("/{camera_id}")

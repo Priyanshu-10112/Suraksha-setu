@@ -8,3 +8,4 @@ async def list_alerts(limit: int = 10):
     """Get recent alerts"""
     alerts = get_alerts(limit)
     return {"alerts": alerts}
+#fcchtchc

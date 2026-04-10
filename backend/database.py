@@ -34,6 +34,7 @@ def init_db():
             y1 INTEGER NOT NULL,
             x2 INTEGER NOT NULL,
             y2 INTEGER NOT NULL,
+            zone_type TEXT DEFAULT 'normal',
             FOREIGN KEY (camera_id) REFERENCES cameras(camera_id)
         )
     """)
@@ -49,6 +50,8 @@ def init_db():
             image_path TEXT NOT NULL,
             message TEXT NOT NULL,
             timestamp TEXT NOT NULL,
+            zone_type TEXT DEFAULT 'normal',
+            alert_type TEXT DEFAULT 'intrusion',
             FOREIGN KEY (camera_id) REFERENCES cameras(camera_id)
         )
     """)
@@ -60,6 +63,27 @@ def init_db():
             value TEXT NOT NULL
         )
     """)
+    
+    # Migrate existing zones table if needed
+    try:
+        cursor.execute("SELECT zone_type FROM zones LIMIT 1")
+    except:
+        # Column doesn't exist, add it
+        print("⚠️ Migrating zones table - adding zone_type column")
+        cursor.execute("ALTER TABLE zones ADD COLUMN zone_type TEXT DEFAULT 'normal'")
+    
+    # Migrate existing alerts table if needed
+    try:
+        cursor.execute("SELECT zone_type FROM alerts LIMIT 1")
+    except:
+        print("⚠️ Migrating alerts table - adding zone_type column")
+        cursor.execute("ALTER TABLE alerts ADD COLUMN zone_type TEXT DEFAULT 'normal'")
+    
+    try:
+        cursor.execute("SELECT alert_type FROM alerts LIMIT 1")
+    except:
+        print("⚠️ Migrating alerts table - adding alert_type column")
+        cursor.execute("ALTER TABLE alerts ADD COLUMN alert_type TEXT DEFAULT 'intrusion'")
     
     conn.commit()
     conn.close()

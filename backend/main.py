@@ -38,6 +38,14 @@ async def root():
         "version": "2.0"
     }
 
+@app.get("/favicon.ico")
+async def favicon():
+    return {"message": "No favicon"}
+
+@app.get("/sw.js")
+async def service_worker():
+    return {"message": "No service worker"}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time alerts"""
