@@ -52,6 +52,7 @@ def init_db():
             timestamp TEXT NOT NULL,
             zone_type TEXT DEFAULT 'normal',
             alert_type TEXT DEFAULT 'intrusion',
+            status TEXT DEFAULT 'new',
             FOREIGN KEY (camera_id) REFERENCES cameras(camera_id)
         )
     """)
@@ -84,6 +85,12 @@ def init_db():
     except:
         print("⚠️ Migrating alerts table - adding alert_type column")
         cursor.execute("ALTER TABLE alerts ADD COLUMN alert_type TEXT DEFAULT 'intrusion'")
+    
+    try:
+        cursor.execute("SELECT status FROM alerts LIMIT 1")
+    except:
+        print("⚠️ Migrating alerts table - adding status column")
+        cursor.execute("ALTER TABLE alerts ADD COLUMN status TEXT DEFAULT 'new'")
     
     conn.commit()
     conn.close()

@@ -77,14 +77,3 @@ def apply_zone_margin(zone, margin_percent=0.05):
         "x2": zone["x2"] - margin_x,
         "y2": zone["y2"] - margin_y
     }
-
-def get_center_point(bbox):
-    """Get center point of bounding box"""
-    x1, y1, x2, y2 = bbox
-    return ((x1 + x2) / 2, (y1 + y2) / 2)
-
-def is_center_in_zone(bbox, zone):
-    """Check if bbox center is inside zone (legacy method)"""
-    cx, cy = get_center_point(bbox)
-    return (zone["x1"] <= cx <= zone["x2"] and 
-            zone["y1"] <= cy <= zone["y2"])

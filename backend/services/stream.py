@@ -118,11 +118,7 @@ def generate_frames(camera_id: str, source: str):
     # Initialize live detection model
     init_live_model()
     
-    # Get zones for this camera
-    zones = get_zones(camera_id)
-    zones_with_margin = [apply_zone_margin(z, ZONE_MARGIN) for z in zones]
-    
-    print(f"✅ Starting enhanced stream for {camera_id} with {len(zones)} zones")
+    print(f"✅ Starting enhanced stream for {camera_id}")
     
     consecutive_failures = 0
     max_failures = 5
@@ -171,6 +167,10 @@ def generate_frames(camera_id: str, source: str):
                 
                 # Run detection every 2 frames for performance
                 if frame_count % 2 == 0 and live_model:
+                    # Reload zones every frame to get latest configuration
+                    zones = get_zones(camera_id)
+                    zones_with_margin = [apply_zone_margin(z, ZONE_MARGIN) for z in zones]
+                    
                     # Run YOLO detection
                     results = live_model(frame, classes=[0], verbose=False)
                     
