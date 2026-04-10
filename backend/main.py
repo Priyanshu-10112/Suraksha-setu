@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from database import init_db
 from services.websocket import ws_manager
-from routes import cameras, zones, alerts, control, stream
+from services.face_recognition_service import load_criminal_dataset
+from routes import cameras, zones, alerts, control, stream, face_recognition
 import uvicorn
 
 app = FastAPI(title="Suraksha-Setu Backend API")
@@ -23,12 +24,21 @@ app.mount("/images", StaticFiles(directory="storage/alerts"), name="images")
 # Initialize database
 init_db()
 
+# Load criminal dataset
+print("=" * 60)
+print("🔐 LOADING CRIMINAL FACE RECOGNITION DATABASE")
+print("=" * 60)
+load_criminal_dataset()
+print("=" * 60)
+
 # Include routers
 app.include_router(cameras.router)
 app.include_router(zones.router)
 app.include_router(alerts.router)
 app.include_router(control.router)
 app.include_router(stream.router)
+app.include_router(face_recognition.router)
+app.include_router(face_recognition.criminals_router)  # Add criminals endpoint
 
 @app.get("/")
 async def root():

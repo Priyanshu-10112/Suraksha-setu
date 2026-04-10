@@ -92,5 +92,17 @@ def init_db():
         print("⚠️ Migrating alerts table - adding status column")
         cursor.execute("ALTER TABLE alerts ADD COLUMN status TEXT DEFAULT 'new'")
     
+    try:
+        cursor.execute("SELECT suspect_name FROM alerts LIMIT 1")
+    except:
+        print("⚠️ Migrating alerts table - adding suspect_name column")
+        cursor.execute("ALTER TABLE alerts ADD COLUMN suspect_name TEXT")
+    
+    try:
+        cursor.execute("SELECT face_confidence FROM alerts LIMIT 1")
+    except:
+        print("⚠️ Migrating alerts table - adding face_confidence column")
+        cursor.execute("ALTER TABLE alerts ADD COLUMN face_confidence REAL")
+    
     conn.commit()
     conn.close()

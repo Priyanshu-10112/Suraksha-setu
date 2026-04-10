@@ -1,15 +1,16 @@
 # Suraksha-Setu 🛡️
 
-AI-powered intrusion detection system with real-time person detection, zone-based monitoring, and live video feed with color-coded alerts.
+AI-powered intrusion detection system with real-time person detection, zone-based monitoring, criminal face recognition, and live video feed with color-coded alerts.
 
 ## 🎯 Overview
 
-Suraksha-Setu uses YOLOv8 for real-time person detection across multiple camera feeds. It features zone-based intrusion detection with three zone types (normal, safe, restricted), advanced tracking, risk scoring, and live video streams with color-coded bounding boxes.
+Suraksha-Setu uses YOLOv8 for real-time person detection across multiple camera feeds. It features zone-based intrusion detection with three zone types (normal, safe, restricted), criminal face recognition, advanced tracking, risk scoring, and live video streams with color-coded bounding boxes.
 
 ## ✨ Features
 
 - 📹 **Multi-camera Support** - Monitor multiple cameras simultaneously
 - 🎯 **Zone-based Detection** - Three zone types: Normal, Safe, Restricted
+- 🔐 **Face Recognition** - Identify known criminals/terrorists (NEW)
 - 🧠 **YOLOv8 Person Detection** - Accurate real-time detection
 - 📊 **Advanced Tracking** - IoU-based tracking with 3-frame confirmation
 - ⚠️ **Smart Risk Scoring** - Dynamic risk calculation (0-100)
@@ -97,6 +98,14 @@ Server starts at `http://localhost:8000` 🎉
 |--------|----------|-------------|
 | GET | `/api/alerts?limit=10` | Get recent alerts |
 
+### 🔐 Face Recognition (NEW)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/criminals/` | Get list of all criminals |
+| GET | `/api/criminals/status` | Check face recognition status |
+| POST | `/api/criminals/reload` | Reload criminal database |
+
 ### 🔌 WebSocket
 
 | Endpoint | Description |
@@ -176,6 +185,14 @@ const ws = new WebSocket('ws://localhost:8000/ws');
 ws.onmessage = (event) => {
   const alert = JSON.parse(event.data);
   console.log('Alert:', alert);
+  
+  // Criminal Alert
+  if (alert.type === "criminal_detected") {
+    console.log('🚨 CRIMINAL:', alert.suspect_name);
+    console.log('Face Match:', alert.face_confidence);
+  }
+  
+  // Normal Alert
   // {
   //   type: "alert",
   //   camera_id: "CAM1",
@@ -191,6 +208,54 @@ ws.onmessage = (event) => {
   // }
 };
 ```
+
+### 7. Face Recognition Setup (NEW)
+
+**Add Criminal Photos:**
+
+1. Create folder structure:
+```bash
+cd backend/dataset/criminals
+mkdir Rabbu_Bagri
+mkdir Lovekush
+mkdir Priyanshu
+```
+
+2. Add photos to each folder:
+```
+criminals/
+├── Rabbu_Bagri/
+│   ├── photo1.jpg
+│   ├── photo2.jpg
+│   └── photo3.jpg
+├── Lovekush/
+│   └── photo1.jpg
+└── Priyanshu/
+    └── photo1.jpg
+```
+
+3. Reload database (no restart needed):
+```bash
+curl -X POST http://localhost:8000/api/criminals/reload
+```
+
+4. Check status:
+```bash
+curl http://localhost:8000/api/criminals/status
+```
+
+**Photo Guidelines:**
+- Front-facing, clear photos
+- Good lighting
+- Multiple photos per person (3-5 recommended)
+- Formats: .jpg, .jpeg, .png
+
+**Criminal Detection:**
+- When criminal detected → HIGH PRIORITY alert
+- Risk: Always 100
+- Alert type: "criminal_detected"
+- Image marked with "_CRIMINAL" suffix
+- Includes suspect name and face confidence
 
 ## ⚙️ Configuration
 
@@ -242,7 +307,8 @@ suraksha-setu/
 │   │   ├── zones.py
 │   │   ├── alerts.py
 │   │   ├── control.py
-│   │   └── stream.py           # Video streaming
+│   │   ├── stream.py           # Video streaming
+│   │   └── face_recognition.py # Face recognition API (NEW)
 │   │
 │   ├── services/               # Core logic
 │   │   ├── detection.py        # Main detection loop
@@ -252,7 +318,14 @@ suraksha-setu/
 │   │   ├── zone_utils.py       # Zone calculations
 │   │   ├── motion.py           # Motion detection
 │   │   ├── risk.py             # Risk scoring
-│   │   └── websocket.py        # WebSocket manager
+│   │   ├── websocket.py        # WebSocket manager
+│   │   └── face_recognition_service.py  # Face recognition (NEW)
+│   │
+│   ├── dataset/                # Face recognition dataset (NEW)
+│   │   └── criminals/          # Criminal photos
+│   │       ├── Rabbu_Bagri/
+│   │       ├── Lovekush/
+│   │       └── Priyanshu/
 │   │
 │   ├── storage/                # Auto-created
 │   │   ├── suraksha.db         # Database
@@ -261,6 +334,8 @@ suraksha-setu/
 │   ├── requirements.txt
 │   └── yolov8n.pt             # YOLO model (auto-downloaded)
 │
+├── FRONTEND_FACE_RECOGNITION_GUIDE.md  # Frontend integration guide
+├── API_ENDPOINTS_SUMMARY.md            # API quick reference
 └── README.md
 ```
 
@@ -271,11 +346,20 @@ suraksha-setu/
 1. **Camera Stream**: Shared camera access with thread-safe locks
 2. **Frame Processing**: Every 2nd frame (configurable)
 3. **YOLO Detection**: Person detection with confidence threshold
-4. **Filtering**: Edge, size, and confidence filters
-5. **Tracking**: IoU-based tracking with 3-frame confirmation
-6. **Zone Check**: Calculate Intersection over Area (IoA)
-7. **Risk Calculation**: Multi-factor risk scoring
-8. **Alert Generation**: Save frame, database entry, WebSocket broadcast
+4. **Face Recognition**: Check if person is known criminal (every 5th frame)
+5. **Filtering**: Edge, size, and confidence filters
+6. **Tracking**: IoU-based tracking with 3-frame confirmation
+7. **Zone Check**: Calculate Intersection over Area (IoA)
+8. **Risk Calculation**: Multi-factor risk scoring
+9. **Alert Generation**: Save frame, database entry, WebSocket broadcast
+
+### Alert Types
+
+| Alert Type | Trigger | Risk | Priority |
+|------------|---------|------|----------|
+| Criminal Detected | Known criminal identified | 100 | 🚨 CRITICAL |
+| Intrusion | Person in restricted zone | 50-100 | ⚠️ HIGH |
+| Presence | Person in safe zone | 10-50 | ℹ️ MEDIUM |
 
 ### Zone Types & Alerts
 
@@ -284,6 +368,7 @@ suraksha-setu/
 | Normal | None | 🟢 Green | +0 |
 | Safe | Presence | 🟡 Yellow | +10 |
 | Restricted | Intrusion | 🔴 Red | +30 |
+| Criminal | Criminal Detected | 🔴 Red | +100 |
 
 ### Risk Scoring
 
@@ -338,6 +423,7 @@ The live video feed (`/api/stream/video_feed/{camera_id}`) shows:
 ```sql
 - id, camera_id (FK), location, risk, confidence
 - image_path, message, timestamp, zone_type, alert_type
+- suspect_name (nullable), face_confidence (nullable)  # NEW
 ```
 
 **Note:** Deleting a camera automatically deletes its zones.
@@ -369,6 +455,12 @@ The live video feed (`/api/stream/video_feed/{camera_id}`) shows:
 - Verify person is inside zone (check IoA in logs)
 - Lower confidence threshold in config
 
+**Criminal not detected:**
+- Check face recognition status: `GET /api/criminals/status`
+- Verify photos are loaded (check server logs)
+- Ensure face is clearly visible and front-facing
+- Add multiple photos per person for better accuracy
+
 **Stream not loading:**
 - Check camera is added: `GET /api/cameras`
 - Start detection first: `POST /api/control/start/{camera_id}`
@@ -378,6 +470,7 @@ The live video feed (`/api/stream/video_feed/{camera_id}`) shows:
 - Increase `FRAME_SKIP` (2 → 3 or 4)
 - Use lower camera resolution
 - Reduce active cameras
+- Face recognition runs every 5th frame (already optimized)
 
 **Orphan zones error:**
 - Fixed: Deleting camera now auto-deletes zones
@@ -403,6 +496,13 @@ For multiple cameras, use unique sources:
 ## 📧 Support
 
 For issues, check logs or open a GitHub issue.
+
+## 📚 Additional Documentation
+
+- **Frontend Integration**: See `FRONTEND_FACE_RECOGNITION_GUIDE.md`
+- **API Reference**: See `API_ENDPOINTS_SUMMARY.md`
+- **Face Recognition Setup**: See `backend/FACE_RECOGNITION_GUIDE.md`
+- **Quick Start Guide**: See `QUICK_START_FACE_RECOGNITION.md`
 
 ---
 

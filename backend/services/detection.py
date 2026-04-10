@@ -27,6 +27,12 @@ from services.zone_utils import (
     apply_zone_margin
 )
 from services.motion import MotionDetector
+from services.face_recognition_service import (
+    get_face_encoding, 
+    match_face, 
+    is_dataset_loaded
+)
+
 
 # Global instances
 model = None
@@ -233,6 +239,112 @@ async def detect_loop(camera_id: str):
             if track_id in alerted_tracks[camera_id]:
                 continue
             
+            # === FACE RECOGNITION LAYER (NEW) ===
+            # Run face recognition every 5th frame for performance
+            # Only on high-confidence person detections
+            suspect_name = None
+            face_conf = None
+            is_criminal = False
+            
+            # Only run face recognition if:
+            # 1. Dataset is loaded
+            # 2. Every 5th frame
+            # 3. Person detection confidence > 0.7 (very high confidence)
+            # 4. Track is stable (hit_count >= 4)
+            if (is_dataset_loaded() and 
+                frame_count % 5 == 0 and 
+                confidence > 0.7 and 
+                hit_count >= 4):
+                try:
+                    face_encoding = get_face_encoding(frame, bbox)
+                    if face_encoding is not None:
+                        match_result = match_face(face_encoding)
+                        if match_result:
+                            # Very strict validation: face confidence must be very high
+                            if match_result['confidence'] >= 0.80:
+                                suspect_name = match_result['name']
+                                face_conf = match_result['confidence']
+                                is_criminal = True
+                                print(f"🚨 CRIMINAL DETECTED: {suspect_name} (face: {face_conf:.2f}, person: {confidence:.2f})")
+                            else:
+                                print(f"⚠️ Low confidence match: {match_result['name']} ({match_result['confidence']:.2f}) - REJECTED")
+                except Exception as e:
+                    print(f"⚠️ Face recognition error: {e}")
+            
+            # === CRIMINAL ALERT (HIGH PRIORITY) ===
+            if is_criminal:
+                # Check cooldown
+                current_time = time.time()
+                last_time = last_alert_times.get(camera_id, 0)
+                
+                if current_time - last_time < COOLDOWN_SECONDS:
+                    continue
+                
+                last_alert_times[camera_id] = current_time
+                alerted_tracks[camera_id].add(track_id)
+                
+                # Save frame with criminal marking
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                image_filename = f"{camera_id}_{timestamp}_CRIMINAL.jpg"
+                image_path = Path(ALERT_STORAGE_PATH) / image_filename
+                
+                # Draw red bounding box
+                x1, y1, x2, y2 = [int(v) for v in bbox]
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+                cv2.putText(frame, f"CRIMINAL: {suspect_name}", (x1, y1-10), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                cv2.imwrite(str(image_path), frame)
+                
+                # Create high-priority alert
+                time_str = datetime.now().strftime("%I:%M %p")
+                message = f"🚨 CRIMINAL DETECTED - Camera '{camera_id}' at {camera['location']} identified KNOWN CRIMINAL '{suspect_name}' at {time_str}. IMMEDIATE ACTION REQUIRED! Face Match: {int(face_conf*100)}%, Detection Confidence: {int(confidence*100)}%"
+                
+                alert_data = {
+                    "type": "criminal_detected",
+                    "camera_id": camera_id,
+                    "location": camera["location"],
+                    "risk": 100,
+                    "risk_level": "critical",
+                    "confidence": round(confidence, 2),
+                    "image": image_filename,
+                    "message": message,
+                    "timestamp": datetime.now().isoformat(),
+                    "zone_type": "criminal",
+                    "alert_type": "criminal_detected",
+                    "suspect_name": suspect_name,
+                    "face_confidence": round(face_conf, 2),
+                    "priority": "HIGH",
+                    "tracking_info": {
+                        "track_id": track_id,
+                        "hit_count": hit_count
+                    }
+                }
+                
+                # Save to database
+                save_alert(
+                    camera_id,
+                    camera["location"],
+                    100,
+                    confidence,
+                    image_filename,
+                    message,
+                    alert_data["timestamp"],
+                    "criminal",
+                    "criminal_detected",
+                    suspect_name,
+                    face_conf
+                )
+                
+                # Broadcast via WebSocket
+                await ws_manager.broadcast(alert_data)
+                
+                print(f"🚨 CRIMINAL ALERT: {camera_id} - {suspect_name} detected!")
+                print(f"   Face Match: {face_conf:.2f} | Detection: {confidence:.2f}")
+                
+                # Skip normal zone-based detection for this track
+                continue
+            
+            # === NORMAL INTRUSION DETECTION (EXISTING LOGIC) ===
             # Find matching zone with highest priority
             triggered_zone = None
             best_ioa = 0

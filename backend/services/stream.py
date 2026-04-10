@@ -108,6 +108,11 @@ def generate_frames(camera_id: str, source: str):
     """Generate MJPEG frames with real-time person detection and color-coded boxes"""
     from models.zone import get_zones
     from services.zone_utils import calculate_intersection_over_area, apply_zone_margin
+    from services.face_recognition_service import (
+        get_face_encoding, 
+        match_face, 
+        is_dataset_loaded
+    )
     
     cap = get_camera_stream(camera_id, source)
     
@@ -119,10 +124,13 @@ def generate_frames(camera_id: str, source: str):
     init_live_model()
     
     print(f"✅ Starting enhanced stream for {camera_id}")
+    if is_dataset_loaded():
+        print(f"✅ Face recognition enabled for stream {camera_id}")
     
     consecutive_failures = 0
     max_failures = 5
     frame_count = 0
+    criminal_tracks = {}  # Track criminal detections to avoid repeated checks
     
     try:
         while True:
@@ -187,6 +195,59 @@ def generate_frames(camera_id: str, source: str):
                             bbox = box.xyxy[0].cpu().numpy().tolist()
                             x1, y1, x2, y2 = [int(v) for v in bbox]
                             
+                            # === FACE RECOGNITION CHECK (CRIMINAL DETECTION) ===
+                            is_criminal = False
+                            suspect_name = None
+                            face_conf = None
+                            
+                            # Run face recognition every 5th frame for high-confidence detections
+                            if (is_dataset_loaded() and 
+                                frame_count % 5 == 0 and 
+                                confidence > 0.70):
+                                try:
+                                    face_encoding = get_face_encoding(frame, bbox)
+                                    if face_encoding is not None:
+                                        match_result = match_face(face_encoding)
+                                        if match_result and match_result['confidence'] >= 0.80:
+                                            suspect_name = match_result['name']
+                                            face_conf = match_result['confidence']
+                                            is_criminal = True
+                                            # Cache criminal detection
+                                            bbox_key = f"{x1}_{y1}_{x2}_{y2}"
+                                            criminal_tracks[bbox_key] = (suspect_name, face_conf)
+                                except Exception as e:
+                                    pass  # Silently fail to avoid breaking stream
+                            
+                            # Check if this bbox was previously identified as criminal
+                            bbox_key = f"{x1}_{y1}_{x2}_{y2}"
+                            if bbox_key in criminal_tracks:
+                                suspect_name, face_conf = criminal_tracks[bbox_key]
+                                is_criminal = True
+                            
+                            # === DRAW CRIMINAL WITH RED BORDER ===
+                            if is_criminal:
+                                color = (0, 0, 255)  # Bright red for criminals
+                                label = f"CRIMINAL: {suspect_name} {int(face_conf*100)}%"
+                                
+                                # Draw thick red bounding box
+                                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 4)
+                                
+                                # Draw label background (red)
+                                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                                cv2.rectangle(frame, (x1, y1 - label_size[1] - 15), 
+                                            (x1 + label_size[0] + 10, y1), color, -1)
+                                
+                                # Draw label text (white)
+                                cv2.putText(frame, label, (x1 + 5, y1 - 8), 
+                                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                                
+                                # Add warning icon/text
+                                cv2.putText(frame, "!!! ALERT !!!", (x1, y2 + 25), 
+                                          cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                                
+                                continue  # Skip zone-based detection for criminals
+                            
+                            # === NORMAL ZONE-BASED DETECTION ===
                             # Determine zone type and color
                             zone_type = "normal"
                             best_ioa = 0

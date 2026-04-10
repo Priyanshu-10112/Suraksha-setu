@@ -2,15 +2,15 @@ from database import get_connection
 from pathlib import Path
 from config import ALERT_STORAGE_PATH
 
-def save_alert(camera_id, location, risk, confidence, image_path, message, timestamp, zone_type="normal", alert_type="intrusion"):
+def save_alert(camera_id, location, risk, confidence, image_path, message, timestamp, zone_type="normal", alert_type="intrusion", suspect_name=None, face_confidence=None):
     """Save alert to database"""
     conn = get_connection()
     cursor = conn.cursor()
     
     cursor.execute("""
-        INSERT INTO alerts (camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type))
+        INSERT INTO alerts (camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type, suspect_name, face_confidence)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type, suspect_name, face_confidence))
     
     alert_id = cursor.lastrowid
     conn.commit()
@@ -24,7 +24,7 @@ def get_alerts(limit=10):
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT id, camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type
+        SELECT id, camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type, suspect_name, face_confidence
         FROM alerts
         ORDER BY id DESC
         LIMIT ?
@@ -45,7 +45,9 @@ def get_alerts(limit=10):
             "message": row[6],
             "timestamp": row[7],
             "zone_type": row[8] if len(row) > 8 else "normal",
-            "alert_type": row[9] if len(row) > 9 else "intrusion"
+            "alert_type": row[9] if len(row) > 9 else "intrusion",
+            "suspect_name": row[10] if len(row) > 10 else None,
+            "face_confidence": row[11] if len(row) > 11 else None
         })
     
     return alerts
@@ -83,7 +85,7 @@ def get_alert_by_id(alert_id):
     cursor = conn.cursor()
     
     cursor.execute("""
-        SELECT id, camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type
+        SELECT id, camera_id, location, risk, confidence, image_path, message, timestamp, zone_type, alert_type, suspect_name, face_confidence
         FROM alerts
         WHERE id = ?
     """, (alert_id,))
@@ -104,5 +106,7 @@ def get_alert_by_id(alert_id):
         "message": row[6],
         "timestamp": row[7],
         "zone_type": row[8] if len(row) > 8 else "normal",
-        "alert_type": row[9] if len(row) > 9 else "intrusion"
+        "alert_type": row[9] if len(row) > 9 else "intrusion",
+        "suspect_name": row[10] if len(row) > 10 else None,
+        "face_confidence": row[11] if len(row) > 11 else None
     }
