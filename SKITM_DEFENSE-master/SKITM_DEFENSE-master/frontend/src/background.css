@@ -1,0 +1,442 @@
+/* ═══════════════════════════════════════════════════
+   Suraksha-Setu — Layered Background System
+   All animations: CSS only, GPU-composited
+   Total DOM nodes added: ~14 (negligible)
+═══════════════════════════════════════════════════ */
+
+/* ── Root container ─────────────────────────────── */
+.bg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bg-layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Layer 1: Base gradient shift ───────────────────
+   Very slow color drift across dark navy tones.
+   background-position animation = GPU only.
+─────────────────────────────────────────────────── */
+@keyframes baseShift {
+  0%   { background-position: 0% 0%; }
+  33%  { background-position: 100% 50%; }
+  66%  { background-position: 50% 100%; }
+  100% { background-position: 0% 0%; }
+}
+
+.bg-base {
+  background: linear-gradient(
+    135deg,
+    #0c1520 0%,
+    #141c2b 30%,
+    #1a2640 60%,
+    #0d1b2a 80%,
+    #141c2b 100%
+  );
+  background-size: 300% 300%;
+  animation: baseShift 20s ease infinite;
+}
+
+/* ── Layer 2: Tactical grid overlay ─────────────────
+   Faint grid lines that drift diagonally.
+   Uses background-position on a repeating gradient.
+─────────────────────────────────────────────────── */
+@keyframes gridDrift {
+  0%   { background-position: 0px 0px; }
+  100% { background-position: 60px 60px; }
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(74, 158, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(74, 158, 255, 0.055) 1px, transparent 1px);
+  background-size: 60px 60px;
+  animation: gridDrift 25s linear infinite;
+  opacity: 1;
+}
+
+/* ── Layer 3: Horizontal scan lines ─────────────────
+   Very thin repeating lines that scroll downward.
+   Simulates surveillance monitor phosphor effect.
+─────────────────────────────────────────────────── */
+@keyframes scanScroll {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 120px; }
+}
+
+.bg-scan {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(59, 130, 246, 0.022) 3px,
+    rgba(59, 130, 246, 0.022) 4px
+  );
+  background-size: 100% 4px;
+  animation: scanScroll 10s linear infinite;
+}
+
+/* ── Layer 4: Radar sweep ───────────────────────────
+   Positioned at center (via inline style).
+   Conic gradient rotates — pure CSS.
+   opacity 0.07 — barely visible.
+─────────────────────────────────────────────────── */
+@keyframes radarSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes radarPulse {
+  0%,100% { opacity: 0.06; }
+  50%      { opacity: 0.10; }
+}
+
+.bg-radar {
+  /* constrain to bottom-left corner */
+  top: auto; left: 0; right: auto; bottom: 0;
+  width: 280px;
+  height: 280px;
+  overflow: hidden;
+}
+
+.radar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(74, 158, 255, 0.08);
+  box-shadow:
+    0 0 0 40px rgba(74,158,255,0.015),
+    0 0 0 80px rgba(74,158,255,0.01),
+    0 0 0 120px rgba(74,158,255,0.008);
+  animation: radarPulse 4s ease-in-out infinite;
+}
+
+.radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 300deg,
+    rgba(74, 158, 255, 0.07) 330deg,
+    rgba(74, 158, 255, 0.10) 360deg
+  );
+  animation: radarSpin 7s linear infinite;
+}
+
+/* ── Ensure UI sits above background ────────────────
+   All main layout elements get z-index: 1+
+─────────────────────────────────────────────────── */
+.dashboard,
+.login-page {
+  position: relative;
+  z-index: 1;
+  /* Remove background from dashboard so bg-root shows through */
+  background: transparent !important;
+}
+
+/* Keep topbar, sidebar, panels opaque */
+.topbar   { position: relative; z-index: 100; }
+.sidebar  { position: relative; z-index: 10; }
+.page-content { 
+  position: relative; 
+  z-index: 10; 
+  /* Make page-content background semi-transparent so electric bg shows through */
+  background: rgba(20, 28, 43, 0.75) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ═══════════════════════════════════════════════════
+   BackgroundVideo — CSS-animated defense signal BG
+   Used on login pages (no actual video file needed)
+═══════════════════════════════════════════════════ */
+
+.bgv-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Base: deep navy */
+.bgv-base {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, #060d14 0%, #0c1520 40%, #0d1b2a 70%, #060d14 100%);
+  background-size: 300% 300%;
+  animation: baseShift 18s ease infinite;
+}
+
+/* Grid: tactical map lines */
+.bgv-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,100,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,100,0.04) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: gridDrift 30s linear infinite;
+}
+
+/* Radar: centered large sweep */
+.bgv-radar-wrap {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 600px;
+}
+
+@keyframes radarSpin2 {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.bgv-radar-ring {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0,255,100,0.06);
+}
+.bgv-radar-ring.r1 { inset: 0; }
+.bgv-radar-ring.r2 { inset: 80px; }
+.bgv-radar-ring.r3 { inset: 180px; }
+
+.bgv-radar-sweep {
+  position: absolute; inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 280deg,
+    rgba(0,255,100,0.04) 320deg,
+    rgba(0,255,100,0.08) 360deg
+  );
+  animation: radarSpin2 8s linear infinite;
+}
+
+/* Scan lines */
+.bgv-scan {
+  position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,255,100,0.018) 3px,
+    rgba(0,255,100,0.018) 4px
+  );
+  animation: scanScroll 12s linear infinite;
+}
+
+/* Dark overlay — ensures login card readability */
+.bgv-overlay {
+  position: absolute; inset: 0;
+  background: rgba(6, 13, 20, 0.72);
+}
+
+/* Login page: remove its own background so bgv shows */
+.login-page {
+  background: transparent !important;
+  animation: none !important;
+}
+
+/* Login card sits above bgv */
+.login-card {
+  position: relative;
+  z-index: 10;
+  /* Remove the CSS animation — framer-motion handles it now */
+  animation: none !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   ElectricBackground — login page layers
+═══════════════════════════════════════════════════ */
+
+.electric-bg {
+  position: fixed; 
+  inset: 0; 
+  z-index: 0; 
+  pointer-events: none; 
+  overflow: hidden;
+}
+
+/* Base dark gradient */
+.eb-base {
+  position: absolute; 
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 30%, #0d1f35 0%, #060d14 55%, #020810 100%);
+}
+
+/* Tactical grid */
+.eb-grid {
+  position: absolute; 
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: gridDrift 28s linear infinite;
+}
+
+/* Horizontal glowing scan line */
+@keyframes scanGlow {
+  0%   { top: -4px; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.eb-scan {
+  position: absolute; 
+  left: 0; 
+  right: 0; 
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.6), rgba(0,212,255,0.9), rgba(0,212,255,0.6), transparent);
+  box-shadow: 0 0 12px 2px rgba(0,212,255,0.4);
+  animation: scanGlow 6s linear infinite;
+}
+
+/* Canvas for electric arcs */
+.electric-canvas {
+  position: absolute; 
+  inset: 0; 
+  width: 100%; 
+  height: 100%;
+}
+
+/* Dark overlay */
+.eb-overlay {
+  position: absolute; 
+  inset: 0;
+  background: rgba(4, 10, 20, 0.65);
+}
+
+/* Login card glow pulse */
+@keyframes cardGlow {
+  0%,100% { opacity: 0.4; }
+  50%      { opacity: 0.9; }
+}
+
+.login-card-glow {
+  position: absolute; inset: -1px; border-radius: inherit;
+  border: 1px solid rgba(0,212,255,0.3);
+  box-shadow: 0 0 20px rgba(0,212,255,0.15), inset 0 0 20px rgba(0,212,255,0.04);
+  animation: cardGlow 3s ease-in-out infinite;
+  pointer-events: none; z-index: 0;
+}
+.civilian-glow {
+  border-color: rgba(34,197,94,0.3) !important;
+  box-shadow: 0 0 20px rgba(34,197,94,0.12), inset 0 0 20px rgba(34,197,94,0.04) !important;
+}
+
+/* Login card: glassmorphism + relative for glow overlay */
+.login-card {
+  position: relative !important;
+  background: rgba(10, 18, 32, 0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  z-index: 10 !important;
+  animation: none !important;
+}
+.login-card > *:not(.login-card-glow) { position: relative; z-index: 1; }
+
+/* Login page: transparent so electric bg shows */
+.login-page {
+  background: transparent !important;
+  animation: none !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   RadarPulse — expanding circular waves
+═══════════════════════════════════════════════════ */
+
+.radar-pulse-wrap {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes radarRing {
+  0% {
+    transform: scale(0.15);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.rp-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.15);
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.2), inset 0 0 10px rgba(0, 212, 255, 0.05);
+  animation: radarRing 3.6s ease-out infinite;
+  display: block;
+}
+
+/* Solid center dot */
+.rp-core {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #00d4ff;
+  box-shadow: 0 0 8px 3px rgba(0, 212, 255, 0.6);
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════
+   WaveBackground — canvas wave animation for dashboards
+═══════════════════════════════════════════════════ */
+
+.wave-bg {
+  position: fixed; 
+  inset: 0; 
+  z-index: 0; 
+  pointer-events: none; 
+  overflow: hidden;
+}
+
+/* Base dark gradient */
+.wb-base {
+  position: absolute; 
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 30%, #0d1f35 0%, #060d14 55%, #020810 100%);
+}
+
+/* Tactical grid */
+.wb-grid {
+  position: absolute; 
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: gridDrift 28s linear infinite;
+}
+
+/* Canvas for wave animation */
+.wave-canvas {
+  position: absolute; 
+  inset: 0; 
+  width: 100%; 
+  height: 100%;
+}
+
+/* Dark overlay */
+.wb-overlay {
+  position: absolute; 
+  inset: 0;
+  background: rgba(4, 10, 20, 0.65);
+}

@@ -1,0 +1,204 @@
+/* ═══════════════════════════════════════════════
+   Suraksha-Setu — Subtle UI Animations
+   Pure CSS, performance-friendly, GPU-composited
+═══════════════════════════════════════════════ */
+
+/* ── 1. Background gradient shift ─────────────────
+   Applied to .dashboard and login pages.
+   Uses transform: translate3d trick to stay on GPU.
+──────────────────────────────────────────────── */
+@keyframes bgShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.dashboard {
+  background: linear-gradient(135deg, #141c2b, #1a2640, #141c2b, #0c1520);
+  background-size: 400% 400%;
+  animation: bgShift 16s ease infinite;
+}
+
+.login-page {
+  background: linear-gradient(135deg, #0c1520, #141c2b, #1a2640, #0c1520);
+  background-size: 400% 400%;
+  animation: bgShift 18s ease infinite;
+}
+
+/* ── 2. Login → Dashboard intro transition ─────────
+   .page-content fades + scales in on mount.
+   CSS-only via animation (no JS needed).
+──────────────────────────────────────────────── */
+@keyframes pageEnter {
+  from { opacity: 0; transform: scale(1.00); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.page-content {
+  animation: pageEnter 2.45s ease both;
+}
+
+/* ── 3. Camera feed horizontal scan line ───────────
+   Replaces the existing scanline ::after with a
+   left→right sweep instead of top→bottom.
+   opacity kept at 0.07 — barely visible.
+──────────────────────────────────────────────── */
+@keyframes scanH {
+  0%   { left: -20%; opacity: 0; }
+  10%  { opacity: 0.07; }
+  90%  { opacity: 0.07; }
+  100% { left: 110%; opacity: 0; }
+}
+
+/* Override the existing scanline on feed-cell-video */
+.feed-cell-video::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -20%;
+  width: 18%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(74, 158, 255, 0.07),
+    transparent
+  );
+  animation: scanH 4s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Also apply to the threat detection large feed */
+.threat-feed-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -20%;
+  width: 18%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(74, 158, 255, 0.06),
+    transparent
+  );
+  animation: scanH 5s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── 4. Live indicator dot blink ───────────────────
+   .rec-dot already exists — just ensure the
+   animation is smooth and consistent.
+──────────────────────────────────────────────── */
+@keyframes liveBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.rec-dot {
+  animation: liveBlink 1.2s ease-in-out infinite !important;
+}
+
+/* Camera feed header live chip dot */
+.feed-cell-live .rec-dot,
+.cam-chip .cam-dot {
+  animation: liveBlink 1.2s ease-in-out infinite !important;
+}
+
+/* ── 5. Alert entry animation ──────────────────────
+   New alert slides down from slightly above + fades.
+   Applied via .alert-card-new (already on first card).
+──────────────────────────────────────────────── */
+@keyframes alertEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-card-new {
+  animation: alertEnter 0.25s ease-out both !important;
+}
+
+/* Alert table row entry */
+.row-new {
+  animation: alertEnter 0.25s ease-out both !important;
+}
+
+/* ── 6. Sidebar nav link hover micro-interaction ───
+   Subtle left-shift on hover for active feel.
+──────────────────────────────────────────────── */
+.sb-link {
+  transition: background 0.2s ease, color 0.2s ease, padding-left 0.2s ease;
+}
+.sb-link:hover {
+  padding-left: 16px;
+}
+.sb-link-active {
+  padding-left: 9px; /* keep active indent */
+}
+
+/* ── 7. Stat card subtle entrance ──────────────────
+   Staggered fade-up for stat cards on page load.
+──────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.stats-row .stat-card {
+  animation: fadeUp 0.4s ease both;
+}
+.stats-row .stat-card:nth-child(1) { animation-delay: 0.05s; }
+.stats-row .stat-card:nth-child(2) { animation-delay: 0.10s; }
+.stats-row .stat-card:nth-child(3) { animation-delay: 0.15s; }
+.stats-row .stat-card:nth-child(4) { animation-delay: 0.20s; }
+
+/* ── 8. Login card entrance ────────────────────────
+   Card lifts in from slightly below on load.
+──────────────────────────────────────────────── */
+@keyframes cardRise {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+.login-card {
+  animation: cardRise 0.45s ease both;
+}
+
+/* ── Performance guard ─────────────────────────────
+   Force GPU compositing on animated elements.
+──────────────────────────────────────────────── */
+.feed-cell,
+.feed-cell-video,
+.threat-feed-wrap,
+.alert-card,
+.stat-card,
+.login-card {
+  will-change: auto; /* let browser decide; avoids memory waste */
+}
+
+/* ── Global button micro-interactions (CSS fallback) ── */
+/* Framer-motion handles scale; CSS handles color transitions */
+.cm-btn, .tbl-btn, .export-btn-lg, .ctrl-btn, .mode-btn,
+.cm-tab, .sb-link, .login-btn, .report-btn, .contact-btn {
+  transition: all 0.18s ease !important;
+}
+
+/* ── Stat card stagger on route change ── */
+.stats-row .stat-card {
+  animation: fadeUp 0.4s ease both;
+}
+
+/* ── Alert card shake keyframe (used by framer-motion x array) ── */
+@keyframes alertShake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX(4px); }
+  60%      { transform: translateX(-3px); }
+  80%      { transform: translateX(3px); }
+}
